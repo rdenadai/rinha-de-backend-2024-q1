@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     hostname: api01
+    restart: on-failure
     environment:
       - DB_HOSTNAME=db
     ports:
@@ -18,8 +19,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "160MB"
+          cpus: "0.45"
+          memory: "155MB"
 
   api02:
     # Essa sintaxe reusa o que foi declarado em 'api01'.
@@ -60,8 +61,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: "220MB"
+          cpus: "0.55"
+          memory: "230MB"
 
 networks:
   default:

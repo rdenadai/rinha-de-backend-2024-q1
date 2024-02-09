@@ -2,7 +2,7 @@
 
 cd /src
 
-sleep 5
+sleep 1
 
 if [ "$MODE" = "development" ]; then
     pip install debugpy -t /tmp && python /tmp/debugpy --wait-for-client --listen 0.0.0.0:5678 -m uvicorn app:app --host 0.0.0.0 --port 8080 --reload 
