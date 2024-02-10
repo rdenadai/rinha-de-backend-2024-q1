@@ -23,12 +23,8 @@ CREATE TABLE saldos (
 		FOREIGN KEY (cliente_id) REFERENCES clientes(id)
 );
 
-CREATE INDEX saldos_clientes_idx ON saldos (cliente_id);
-
-CREATE INDEX transacoes_clientes_idx ON transacoes (cliente_id);
-
-
 CREATE TYPE saldo_result AS (
+	efetuado boolean,
     limite integer,
     saldo integer
 );
@@ -42,6 +38,8 @@ DECLARE
 	saldo integer;
 	result saldo_result;
 BEGIN
+	result.efetuado := false;
+
 	IF pg_try_advisory_lock(uclient_id) THEN
 		SELECT c.limite as limite, s.valor as total
 		INTO climite, ctotal
@@ -49,21 +47,28 @@ BEGIN
 		JOIN saldos s on c.id = s.cliente_id 
 		WHERE c.id = uclient_id;
 		
-        IF utipo = 'd' THEN
-            novo_saldo := ctotal - uvalor;
-            IF novo_saldo < -climite THEN
-                RAISE EXCEPTION 'insufficient funds';
-            END IF;
-        ELSE
-            novo_saldo := ctotal + uvalor;
-        END IF;
+		IF utipo = 'd' THEN
+			novo_saldo := ctotal - uvalor;
+			IF novo_saldo < -climite THEN
+				result.efetuado := true;
+			END IF;
+		ELSE
+			novo_saldo := ctotal + uvalor;
+		END IF;
 
-		UPDATE saldos SET valor = novo_saldo WHERE cliente_id = uclient_id;
-		INSERT INTO transacoes (cliente_id, valor, tipo, descricao) VALUES (uclient_id, uvalor, utipo, udescricao);
+		IF result.efetuado = false THEN
+			UPDATE saldos SET valor = novo_saldo WHERE cliente_id = uclient_id;
+			INSERT INTO transacoes (cliente_id, valor, tipo, descricao) VALUES (uclient_id, uvalor, utipo, udescricao);
+		END IF;
 		PERFORM pg_advisory_unlock(uclient_id);
     END IF;
 	
-	SELECT s.valor as total INTO ctotal FROM saldos s WHERE s.cliente_id = uclient_id;
+	SELECT c.limite as limite, s.valor as total
+	INTO climite, ctotal
+	FROM clientes c 
+	JOIN saldos s on c.id = s.cliente_id 
+	WHERE c.id = uclient_id;
+
 	result.limite := climite;
     result.saldo := ctotal;
     RETURN result;

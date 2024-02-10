@@ -22,6 +22,20 @@ Nome: _Rodolfo De Nadai_
 $> docker build . -f Dockerfile -t rdenadai/rinha-backend-2024q1 && docker run -dp 8080:8080 rdenadai/rinha-backend-2024q1
 ```
 
+Usando docker-compose
+
+```bash
+$> docker-compose down && docker-compose up --build -d
+```
+
+Build && Publish
+
+```bash
+$> docker build -t rdenadai/rinha-backend-2024q1:latest .
+$> docker tag rdenadai/rinha-backend-2024q1:latest rdenadai/rinha-backend-2024q1:latest
+$> docker push rdenadai/rinha-backend-2024q1:latest
+```
+
 - Exportar as dependências de código do projeto
 
 ```bash
