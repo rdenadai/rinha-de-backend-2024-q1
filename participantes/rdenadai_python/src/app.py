@@ -1,86 +1,79 @@
 import asyncio
 import gc
+from typing import Optional
 
 import uvloop
-from asyncpg.exceptions import RaiseError
 from pydantic import ValidationError
 from starlette.applications import Starlette
-from starlette.endpoints import HTTPEndpoint
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.routing import Route
 
-from db import lifespan
+from db import setup_database
 from orjson_response import OrjsonResponse as JSONResponse
 from schemas import BalanceOutput, TransactionInput
-from stmt import READ_ACCOUNT_STATEMENT_SQL, READ_TRANSACTION_SQL, UPDATE_BALANCE_SQL
+from stmt import (
+    CHECK_IF_USER_EXISTS,
+    READ_ACCOUNT_STATEMENT_SQL,
+    READ_TRANSACTION_SQL,
+    UPDATE_BALANCE_SQL,
+)
 
 gc.disable()
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
-class ClientNotValidException(HTTPException):
-    ...
+DEFAULT_ERROR_MSG = "client not found"
 
 
-class Validation:
-    async def check_for_client_id(self, request):
-        try:
-            if not (client_id := request.path_params.get("id", None)):
-                raise ClientNotValidException(status_code=404, detail="id is required")
-            return int(client_id)
-        except ValueError:
-            raise ClientNotValidException(status_code=404, detail="id is required")
+def check_for_client_id(request: Request) -> Optional[int]:
+    if (client_id := request.path_params.get("id", None)) and client_id.isdigit():
+        return int(client_id)
+    return None
 
 
-class Transaction(HTTPEndpoint, Validation):
-    async def post(self, request):
-        if client_id := await self.check_for_client_id(request):
-            try:
-                content = TransactionInput(**(await request.json()))
-            except ValidationError as e:
-                raise ClientNotValidException(status_code=422, detail=str(e.errors()))
-            return await self.database_op(client_id, **content.dict())
-
-    async def database_op(self, client_id, valor, tipo, descricao):
-        async with app.state.connection_pool.acquire() as connection:
-            try:
-                record = dict(
-                    (await connection.fetchrow(UPDATE_BALANCE_SQL, client_id, valor, tipo, descricao)).items()
-                )
-                return JSONResponse({"saldo": record.get("saldo", 0), "limite": record.get("limite", 0)})
-            except RaiseError as e:
-                raise HTTPException(status_code=422, detail=str(e))
-
-
-class AccountStatement(HTTPEndpoint, Validation):
-    async def get(self, request):
-        if client_id := await self.check_for_client_id(request):
-            return await self.database_op(client_id)
-
-    async def database_op(self, client_id):
-        async with app.state.connection_pool.acquire() as connection:
-            async with connection.transaction():
-                balance = BalanceOutput(
-                    **dict((await connection.fetchrow(READ_ACCOUNT_STATEMENT_SQL, client_id) or {}).items())
-                )
-
-                transactions = (
+async def account_statement(request: Request) -> JSONResponse:
+    if client_id := check_for_client_id(request):
+        async with app.state.connection_pool.acquire() as connection, connection.transaction():
+            if record := (await connection.fetchrow(READ_ACCOUNT_STATEMENT_SQL, client_id) or {}):
+                balance = BalanceOutput(**dict(record.items()))
+                transactions = [
                     dict(transaction.items())
                     for transaction in await connection.fetch(READ_TRANSACTION_SQL, client_id) or []
+                ]
+                return JSONResponse(
+                    {"saldo": balance.dict(), "ultimas_transacoes": transactions},
+                    status_code=200,
                 )
-                return JSONResponse({"saldo": balance.dict(), "ultimas_transacoes": tuple(transactions)})
+            return JSONResponse({"detail": DEFAULT_ERROR_MSG}, status_code=404)
+    return JSONResponse({"detail": DEFAULT_ERROR_MSG}, status_code=404)
 
 
-async def http_exception(request: Request, exc: ClientNotValidException):
-    return JSONResponse({"detail": exc.detail}, status_code=422)
+async def transaction(request: Request) -> JSONResponse:
+    if client_id := check_for_client_id(request):
+        try:
+            content = TransactionInput(**(await request.json()))
+            valor, tipo, descricao = content.valor, content.tipo, content.descricao
+            async with app.state.connection_pool.acquire() as connection, connection.transaction():
+                if record := await connection.fetchrow(CHECK_IF_USER_EXISTS, client_id):
+                    record = dict(
+                        (await connection.fetchrow(UPDATE_BALANCE_SQL, client_id, valor, tipo, descricao)).items()
+                        or {"efetuado": True}
+                    )
+                    status_code = 200 if not record.get("efetuado", False) else 422
+                    return JSONResponse(
+                        {"saldo": record.get("saldo", 0), "limite": record.get("limite", 0)},
+                        status_code=status_code,
+                    )
+                return JSONResponse({"detail": DEFAULT_ERROR_MSG}, status_code=404)
+        except ValidationError as e:
+            return JSONResponse({"detail": str(e.errors())}, status_code=422)
+    return JSONResponse({"detail": DEFAULT_ERROR_MSG}, status_code=404)
 
 
 app = Starlette(
     routes=[
-        Route("/clientes/{id}/transacoes", Transaction, methods=["POST"]),
-        Route("/clientes/{id}/extrato", AccountStatement, methods=["GET"]),
+        Route("/clientes/{id}/extrato", account_statement, methods=["GET"]),
+        Route("/clientes/{id}/transacoes", transaction, methods=["POST"]),
     ],
-    lifespan=lifespan,
-    exception_handlers={HTTPException: http_exception},  # type: ignore
+    lifespan=setup_database,
 )
