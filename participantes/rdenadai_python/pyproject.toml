@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "rdenadai-python"
+version = "0.0.1"
+description = "Rinha de Backend 2024 q1 python"
+authors = ["Rodolfo De Nadai <rdenadai@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+starlette = "^0.37.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0.post1"}
+orjson = "^3.9.13"
+asyncpg = "^0.29.0"
+gunicorn = "^21.2.0"
+pydantic = "^2.6.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
