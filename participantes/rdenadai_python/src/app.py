@@ -54,7 +54,7 @@ async def transaction(request: Request) -> JSONResponse:
             content = TransactionInput(**(await request.json()))
             valor, tipo, descricao = content.valor, content.tipo, content.descricao
             async with app.state.connection_pool.acquire() as connection, connection.transaction():
-                if record := await connection.fetchrow(CHECK_IF_USER_EXISTS, client_id):
+                if record := await connection.fetchval(CHECK_IF_USER_EXISTS, client_id):
                     record = dict(
                         (await connection.fetchrow(UPDATE_BALANCE_SQL, client_id, valor, tipo, descricao)).items()
                         or {"efetuado": True}

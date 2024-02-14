@@ -8,8 +8,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-starlette = "^0.37.0"
-uvicorn = {extras = ["standard"], version = "^0.27.0.post1"}
+starlette = "^0.37.1"
+uvicorn = { extras = ["standard"], version = "^0.27.1" }
 orjson = "^3.9.13"
 asyncpg = "^0.29.0"
 gunicorn = "^21.2.0"

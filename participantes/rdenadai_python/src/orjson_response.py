@@ -1,9 +1,9 @@
 from typing import Any
 
-import orjson
+from orjson import dumps
 from starlette.responses import JSONResponse
 
 
 class OrjsonResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
-        return orjson.dumps(content)
+        return dumps(content)
