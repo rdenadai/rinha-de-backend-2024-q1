@@ -1,11 +1,38 @@
+use chrono::{DateTime, Utc};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::TimestampSeconds;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TransactionType {
     Credit,
     Debit,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct TransactionInput {
+    #[serde(deserialize_with = "greater_then_zero")]
+    pub valor: i32,
+    pub tipo: TransactionType,
+    #[serde(deserialize_with = "more_than_zero_less_then_ten")]
+    pub descricao: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionOutput {
+    pub saldo: i32,
+    pub limite: i32,
+}
+
+#[serde_with::serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct Transaction {
+    pub valor: i32,
+    pub tipo: String,
+    pub descricao: String,
+    #[serde_as(as = "TimestampSeconds<String>")]
+    pub realizada_em: DateTime<Utc>,
 }
 
 impl fmt::Display for TransactionType {
@@ -43,20 +70,11 @@ impl<'de> Deserialize<'de> for TransactionType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct TransactionInput {
-    #[serde(deserialize_with = "greater_then_zero")]
-    pub valor: usize,
-    pub tipo: TransactionType,
-    #[serde(deserialize_with = "more_than_zero_less_then_ten")]
-    pub descricao: String,
-}
-
-fn greater_then_zero<'de, D>(deserializer: D) -> Result<usize, D::Error>
+fn greater_then_zero<'de, D>(deserializer: D) -> Result<i32, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let num: usize = usize::deserialize(deserializer)?;
+    let num: i32 = i32::deserialize(deserializer)?;
 
     if num < 0 {
         Err(D::Error::custom("valor must be greater then zero"))
