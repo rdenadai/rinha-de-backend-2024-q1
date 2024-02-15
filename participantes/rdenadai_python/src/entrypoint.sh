@@ -2,4 +2,4 @@
 
 cd /src
 
-gunicorn app:app -b 0.0.0.0:8080 -w 1 -k uvicorn.workers.UvicornWorker -t 300 --access-logfile - --error-logfile -
+uvicorn app:app  --host 0.0.0.0 --port 8080 --loop uvloop --timeout-keep-alive 300

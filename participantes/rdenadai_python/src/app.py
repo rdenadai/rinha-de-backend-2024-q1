@@ -1,26 +1,18 @@
-import asyncio
-import gc
 from typing import Optional
-
-import uvloop
-from pydantic import ValidationError
-from starlette.applications import Starlette
-from starlette.requests import Request
-from starlette.routing import Route
 
 from db import setup_database
 from orjson_response import OrjsonResponse as JSONResponse
+from pydantic import ValidationError
 from schemas import BalanceOutput, TransactionInput
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.routing import Route
 from stmt import (
     CHECK_IF_USER_EXISTS,
     READ_ACCOUNT_STATEMENT_SQL,
     READ_TRANSACTION_SQL,
     UPDATE_BALANCE_SQL,
 )
-
-gc.disable()
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
 
 DEFAULT_ERROR_MSG = "client not found"
 

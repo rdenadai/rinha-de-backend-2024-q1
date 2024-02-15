@@ -11,7 +11,7 @@ async def setup_database(app):
         database="rinha",
         host="db",
         port=5432,
-        max_size=10,
+        max_size=15,
         max_queries=150000,
     )
     yield
